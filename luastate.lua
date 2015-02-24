@@ -1,4 +1,7 @@
---Lua C API binding for Lua 5.1 (Cosmin Apreutesei, public domain)
+
+--Lua C API ffi binding for Lua 5.1 and LuaJIT2.
+--Written by Cosmin Apreutesei. Public Domain.
+
 require'luajit_h'
 local ffi = require'ffi'
 local C = ffi.C
@@ -293,7 +296,8 @@ function M.popvalues(L, top_before_call)
 	end
 end
 
---call the function at the top of the stack, wrapping the passing of args and the returning of return values.
+--call the function at the top of the stack,
+--wrapping the passing of args and the returning of return values.
 function M.pcall(L, ...)
 	local top = M.gettop(L)
 	local argc = M.pushvalues(L, ...)
@@ -313,7 +317,8 @@ function M.call(L, ...)
 	return pass(M.pcall(L, ...))
 end
 
---resume the coroutine at the top of the stack, wrapping the passing of args and the returning of yielded values.
+--resume the coroutine at the top of the stack,
+--wrapping the passing of args and the returning of yielded values.
 function M.resume(L, ...)
 	local top = M.gettop(L)
 	local argc = M.pushvalues(L, ...)
