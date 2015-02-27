@@ -149,7 +149,10 @@ function M.tostring(L, index)
 	return ffi.string(M.tolstring(L, index))
 end
 
-M.next = C.lua_next
+function M.next(L, index)
+	return C.lua_next(L, index) ~= 0
+end
+
 M.gettable = C.lua_gettable
 M.getfield = C.lua_getfield
 M.rawget = C.lua_rawget
@@ -366,10 +369,10 @@ ffi.metatype('lua_State', {__index = {
 	status = M.status,
 	newthread = M.newthread,
 	resume = M.resume,
-	yield = M.yield,
 	--compiler
 	loadbuffer = M.loadbuffer,
 	loadstring = M.loadstring,
+	loadfile = M.loadfile,
 	load = M.load,
 	openlibs = M.openlibs,
 	--stack / indices
@@ -398,13 +401,13 @@ ffi.metatype('lua_State', {__index = {
 	--stack / get / synthesis
 	get = M.get,
 	--stack / write
-	settop = M.settop,
 	pushnil = M.pushnil,
 	pushboolean = M.pushboolean,
 	pushinteger = M.pushinteger,
 	pushcclosure = M.pushcclosure,
 	pushcfunction = M.pushcfunction,
 	pushlightuserdata = M.pushlightuserdata,
+	pushlstring = M.pushlstring,
 	pushstring = M.pushstring,
 	pushthread = M.pushthread,
 	pushvalue = M.pushvalue,
