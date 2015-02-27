@@ -2,6 +2,8 @@
 --Lua C API ffi binding for Lua 5.1 and LuaJIT2.
 --Written by Cosmin Apreutesei. Public Domain.
 
+if not ... then require'luastate_test'; return end
+
 require'luajit_h'
 local ffi = require'ffi'
 local C = ffi.C
@@ -171,19 +173,18 @@ function M.get(L, index)
 	elseif t == 'string' then
 		return M.tostring(L, index)
 	elseif t == 'function' then
-		--[[
 		index = M.abs_index(L, index)
 		M.checkstack(L, 4)
 		M.getglobal(L, 'string')
 		M.getfield(L, -1, 'dump')
 		M.pushvalue(L, index)
-		local ok, s = assert(M.pcall(L))
-		return s
-		]]
-		error'NYI' --todo: get it with lua_dump, or call string.dump and get the result string
+		C.lua_call(L, 1, 1)
+		local s = M.get(L)
+		M.pop(L, 3)
+		return assert(loadstring(s))
 	elseif t == 'table' then
-		--TODO: detect duplicate refs
-		--TODO: stack-bound on table depth
+		--NOTE: doesn't check duplicate refs
+		--NOTE: stack-bound on table depth
 		local top = M.gettop(L)
 		M.checkstack(L, 2)
 		local dt = {}
@@ -248,8 +249,8 @@ function M.push(L, v)
 	elseif type(v) == 'function' then
 		M.loadstring(L, string.dump(v))
 	elseif type(v) == 'table' then
-		--TODO: detect duplicate refs
-		--TOOD: stack-bound on table depth
+		--NOTE: doesn't check duplicate refs
+		--NOTE: stack-bound on table depth
 		M.checkstack(L, 3)
 		M.newtable(L)
 		local top = M.gettop(L)
@@ -412,6 +413,8 @@ ffi.metatype('lua_State', {__index = {
 	pushthread = M.pushthread,
 	pushvalue = M.pushvalue,
 	--stack / write / tables
+	createtable = M.createtable,
+	newtable = M.newtable,
 	settable = M.settable,
 	setfield = M.setfield,
 	rawset = M.rawset,
@@ -435,49 +438,5 @@ ffi.metatype('lua_State', {__index = {
 	getregistry = M.getregistry,
 }})
 
-
-if not ... then
-	local pp = require'pp'.pp
-
-	local lua = M.open()
-	lua:openlibs('base')
-	lua:openlibs()
-
-	assert(lua:loadstring([[
-		local pp = require'pp'.pp
-		pp(...)
-		return 42.5, nil, false, "str", {k=5,t={},[{a=1}]={b=""}}
-	]], 'main'))
-	pp(lua:call(42.5, nil, false, "str", {k=5,t={},[{a=1}]={b=""}}))
-
-	local upvalue = 5
-	lua:push(function(...)
-		print('upvalue: ', upvalue)
-		print(...)
-		local function deep_table(depth)
-			local root = {}
-			local t = root
-			for i=1,depth do --test stack overflow
-				t[1] = {}
-				t = t[1]
-			end
-			return root
-		end
-		return deep_table(3000)
-	end)
-	local function deep_table(depth)
-		local root = {}
-		local t = root
-		for i=1,depth do --test stack overflow
-			t[1] = {}
-			t = t[1]
-		end
-		return root
-	end
-	print(lua:call('hi', 'there', deep_table(3000)).foo)
-
-	assert(lua:gettop() == 0)
-	lua:close()
-end
 
 return M

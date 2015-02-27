@@ -19,7 +19,7 @@ state:loadbuffer(buf, sz, chunkname)    load a Lua chunk from a buffer
 state:loadstring(s, name)               load a Lua chunk from a string
 state:loadfile(filename)                load a Lua chunk from a file
 state:load(reader, data, chunkname)     load a Lua chunk from a reader function
-state:openlibs(lib1, ...)               open standard libs (all if no args given)
+state:openlibs(lib1, ...)               open standard libs (open all, if no args given)
 __stack / indices__
 state:abs_index() -> i                  absolute stack index
 state:gettop() -> i                     top stack index
@@ -57,6 +57,8 @@ state:pushstring(s)                     push a string
 state:pushthread(state)                 push a coroutine
 state:pushvalue(i)                      push value in stack at i
 __stack / write / tables__
+state:createtable(narr, nrec)           push a new empty table with preallocations
+state:newtable()                        push a new empty table
 state:settable(i)                       t[k] = v, where t at i, v at top, k at top-1
 state:setfield(i, k)                    t[k] = v, where t at i, v at top
 state:rawset(i)                         as settable() but does raw assignment
