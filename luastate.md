@@ -72,7 +72,7 @@ state:popvalues(top_before_call) -> ... pop multiple values and return then
 state:pcall(...) -> ok, ...             pop func and args and pcall it
 state:call(...) -> ...                  pop func and args and call it
 __gc__
-state:gc(what, data)                    control the garbage collector
+state:gc(luastate.C.LUA_GC*, n)         control the garbage collector
 state:getgccount() -> n                 get the number of garbage items
 __macros__
 state:upvalueindex(i) -> i              get upvalue pseudo-index
@@ -80,7 +80,9 @@ state:register(name, func)              set _G[name] = func
 state:setglobal(name)                   pop v and set _G[name] = v
 state:getglobal(name)                   push _G[name]
 state:getregistry()                     push the registry table
+__C__
+luastate.C                              C namespace (i.e. the ffi clib object)
 --------------------------------------- --------------------------------------
 
 Note: when pushing tables into the stack, duplicate keys or values
-are dereferenced. Also, max. table depth is stack-bound.
+are dereferenced and table depth is stack-bound.
