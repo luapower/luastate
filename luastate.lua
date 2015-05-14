@@ -351,15 +351,15 @@ function M.register(L, n, f)
 end
 
 function M.getglobal(L, s)
-	return C.lua_getfield(L, C.LUA_GLOBALSINDEX, s)
+	C.lua_getfield(L, C.LUA_GLOBALSINDEX, s)
 end
 
 function M.setglobal(L, s)
-	return C.lua_setfield(L, C.LUA_GLOBALSINDEX, s)
+	C.lua_setfield(L, C.LUA_GLOBALSINDEX, s)
 end
 
 function M.getregistry(L)
-	return C.lua_pushvalue(L, C.LUA_REGISTRYINDEX)
+	C.lua_pushvalue(L, C.LUA_REGISTRYINDEX)
 end
 
 --object interface
