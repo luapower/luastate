@@ -8,6 +8,11 @@ require'luajit_h'
 local ffi = require'ffi'
 local C = ffi.C
 local M = {C = C}
+local cast = ffi.cast
+
+local function not_implemented()
+	error('Not implemented', 3)
+end
 
 --states
 
@@ -49,7 +54,7 @@ end
 function M.load(L, reader, data, chunkname)
 	local reader_cb
 	if type(reader) == 'function' then
-		reader_cb = ffi.cast('lua_Reader', reader)
+		reader_cb = cast('lua_Reader', reader)
 	end
 	local ret = C.lua_load(L, reader_cb or reader, data, chunkname)
 	if reader_cb then reader_cb:free() end
@@ -66,6 +71,7 @@ local lib_openers = {
 	debug = C.luaopen_debug,
 	package = C.luaopen_package,
 	--luajit extensions
+	bit = C.luaopen_bit,
 	ffi = C.luaopen_ffi,
 	jit = C.luaopen_jit,
 }
@@ -140,6 +146,7 @@ end
 M.tonumber = C.lua_tonumber
 M.tothread = C.lua_tothread
 M.touserdata = C.lua_touserdata
+M.topointer = C.lua_topointer
 
 local sz
 function M.tolstring(L, index)
@@ -198,14 +205,17 @@ function M.get(L, index)
 		end
 		assert(M.gettop(L) == top)
 		return dt
-	elseif t == 'lightuserdata' then
+	elseif t == 'lightuserdata' or t == 'userdata' then
+		--NOTE: there's no Lua API to create a (light)userdata, that can
+		--only be done in a Lua/C module; best we can do is to get
+		--it out as a cdata 'void*' pointer.
 		return M.touserdata(L, index)
-	elseif t == 'userdata' then
-		error'NYI'
 	elseif t == 'thread' then
-		error'NYI'
+		--NOTE: this will get out a cdata of type 'lua_State*', not a coroutine.
+		return M.lua_tothread(L, index)
 	elseif t == 'cdata' then
-		error'NYI'
+		--NOTE: there's no LuaJIT C API extension to get the address of a cdata.
+		not_implemented()
 	end
 end
 
@@ -226,6 +236,7 @@ function M.pushstring(L, s, sz)
 end
 M.pushthread = C.lua_pushthread
 M.pushvalue = C.lua_pushvalue --push stack element
+M.newuserdata = C.lua_newuserdata
 
 M.settable = C.lua_settable
 M.setfield = C.lua_setfield
@@ -261,11 +272,16 @@ function M.push(L, v)
 		end
 		assert(M.gettop(L) == top)
 	elseif type(v) == 'userdata' then
-		error'NYI'
+		--NOTE: there's no Lua API to get the size or lightness of a userdata,
+		--so we don't have enough info to duplicate a userdata automatically.
+		not_implemented()
 	elseif type(v) == 'thread' then
-		M.pushthread(L, v)
+		--NOTE: there's no Lua API to get the 'lua_State*' of a coroutine.
+		not_implemented()
 	elseif type(v) == 'cdata' then
-		error'NYI'
+		--NOTE: there's no Lua C API to push a cdata.
+		--cdata are not shareable anyway because ctypes are not shareable.
+		not_implemented()
 	end
 end
 
@@ -339,7 +355,7 @@ function M.getgccount(L)
 	return C.lua_gc(L, C.LUA_GCCOUNT, 0)
 end
 
--- macros from lua.h
+--macros from lua.h
 
 function M.upvalueindex(i)
 	return C.LUA_GLOBALSINDEX - i
@@ -360,6 +376,29 @@ end
 
 function M.getregistry(L)
 	C.lua_pushvalue(L, C.LUA_REGISTRYINDEX)
+end
+
+--utilities to get pointers in and out of Lua states
+
+local intptr_ct = ffi.typeof'intptr_t'
+local voidptr_ct = ffi.typeof'void*'
+local x64 = ffi.abi'64bit'
+
+--convert a pointer's address to a Lua number.
+function M.addr(p)
+	local np = cast(intptr_ct, p)
+   local n = tonumber(np)
+	assert(not x64 or cast(intptr_ct, n) == np) --no high addresses allowed
+	return n
+end
+
+--convert a number representing a memory address to a pointer,
+--optionally specifying a ctype for it.
+function M.ptr(ctype, addr)
+	if not addr then
+		ctype, addr = voidptr_ct, ctype
+	end
+	return cast(ctype, addr)
 end
 
 --object interface

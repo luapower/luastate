@@ -7,6 +7,8 @@ tagline: Lua/LuaJIT C API binding
 A ffi binding to the Lua/LuaJIT C API, allowing the creation and manipulation
 of Lua states.
 
+## API
+
 --------------------------------------- --------------------------------------
 __states__
 luastate.open() -> state                create a new Lua state
@@ -80,9 +82,33 @@ state:register(name, func)              set _G[name] = func
 state:setglobal(name)                   pop v and set _G[name] = v
 state:getglobal(name)                   push _G[name]
 state:getregistry()                     push the registry table
+__utils__
+luastate.addr(ptr) -> n                 pointer's address to Lua number
+luastate.ptr([ctype, ]n) -> ptr         Lua number to pointer cdata
 __C__
 luastate.C                              C namespace (i.e. the ffi clib object)
 --------------------------------------- --------------------------------------
 
-Note: when pushing tables into the stack, duplicate keys or values
-are dereferenced and table depth is stack-bound.
+### API Notes
+
+Getting data out from a Lua state:
+
+  * internal identity of tables is not preserved: duplicate keys
+  and values are dereferenced.
+  * the function for traversing tables is recursive so table depth
+  is stack-bound.
+  * upvalues are not extracted.
+  * coroutines are extracted as cdata of type `lua_State*`.
+  * lightuserdata and userdata are extracted as `void*` pointers.
+  * cdata cannot be extracted (an error is raised if attempted).
+
+Pushing data into a Lua state:
+
+  * internal identity of tables is not preserved: duplicate keys
+  and values are dereferenced.
+  * the function for traversing tables is recursive so table depth
+  is stack-bound.
+  * upvalues are not pushed.
+  * lightuserdata, userdata, cdata and coroutines cannot be pushed
+  (an error is raised if attempted).
+

@@ -102,7 +102,7 @@ int             (lua_toboolean) (lua_State *L, int idx);
 const char     *(lua_tolstring) (lua_State *L, int idx, size_t *len);
 size_t          (lua_objlen) (lua_State *L, int idx);
 lua_CFunction   (lua_tocfunction) (lua_State *L, int idx);
-void	       *(lua_touserdata) (lua_State *L, int idx);
+void	         *(lua_touserdata) (lua_State *L, int idx);
 lua_State      *(lua_tothread) (lua_State *L, int idx);
 const void     *(lua_topointer) (lua_State *L, int idx);
 
