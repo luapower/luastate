@@ -385,6 +385,9 @@ local voidptr_ct = ffi.typeof'void*'
 local x64 = ffi.abi'64bit'
 
 --convert a pointer's address to a Lua number.
+--NOTE: On x64, this only works with pointers allocated by the LuaJIT's
+--allocator (ffi.new(), luaL_newstate()), which always returns pointers
+--with low addresses. Don't use this on pointers allocated differently.
 function M.addr(p)
 	local np = cast(intptr_ct, p)
    local n = tonumber(np)
