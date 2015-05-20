@@ -378,32 +378,6 @@ function M.getregistry(L)
 	C.lua_pushvalue(L, C.LUA_REGISTRYINDEX)
 end
 
---utilities to get pointers in and out of Lua states
-
-local intptr_ct = ffi.typeof'intptr_t'
-local voidptr_ct = ffi.typeof'void*'
-local x64 = ffi.abi'64bit'
-
---convert a pointer's address to a Lua number.
---NOTE: On x64, this only works with pointers allocated by the LuaJIT's
---allocator (ffi.new(), luaL_newstate()), which always returns pointers
---with low addresses. Don't use this on pointers allocated differently.
-function M.addr(p)
-	local np = cast(intptr_ct, p)
-   local n = tonumber(np)
-	assert(not x64 or cast(intptr_ct, n) == np) --no high addresses allowed
-	return n
-end
-
---convert a number representing a memory address to a pointer,
---optionally specifying a ctype for it.
-function M.ptr(ctype, addr)
-	if not addr then
-		ctype, addr = voidptr_ct, ctype
-	end
-	return cast(ctype, addr)
-end
-
 --object interface
 
 ffi.metatype('lua_State', {__index = {

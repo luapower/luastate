@@ -82,9 +82,6 @@ state:register(name, func)              set _G[name] = func
 state:setglobal(name)                   pop v and set _G[name] = v
 state:getglobal(name)                   push _G[name]
 state:getregistry()                     push the registry table
-__utils__
-luastate.addr(ptr) -> n                 pointer's address to Lua number
-luastate.ptr([ctype, ]n) -> ptr         Lua number to pointer cdata
 __C__
 luastate.C                              C namespace (i.e. the ffi clib object)
 --------------------------------------- --------------------------------------
