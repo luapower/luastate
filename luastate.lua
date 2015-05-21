@@ -247,6 +247,7 @@ M.createtable = C.lua_createtable
 function M.newtable(L)
 	C.lua_createtable(L, 0, 0)
 end
+M.xmove = C.lua_xmove
 
 function M.push(L, v)
 	if type(v) == 'nil' then
@@ -408,6 +409,7 @@ ffi.metatype('lua_State', {__index = {
 	tostring = M.tostring,
 	tothread = M.tothread,
 	touserdata = M.touserdata,
+	topointer = M.topointer,
 	--stack / read / tables
 	next = M.next,
 	gettable = M.gettable,
@@ -436,6 +438,7 @@ ffi.metatype('lua_State', {__index = {
 	rawset = M.rawset,
 	rawseti = M.rawseti,
 	setmetatable = M.setmetatable,
+	xmove = M.xmove,
 	--stack / write / synthesis
 	push = M.push,
 	--interpreter

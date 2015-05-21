@@ -38,6 +38,8 @@ state:tolstring(i) -> buf, sz           get as C string
 state:tostring(i) -> s                  get as Lua string
 state:tothread(i) -> state              get as Lua state
 state:touserdata(i) -> ptr              get as userdata
+state:topointer(i) -> ptr               get as void* pointer
+state:xmove(dst_thread, i)              move values between threads
 __stack / read / tables__
 state:next(i) -> true | false           pop k and push the next k, v at i
 state:gettable(i)                       push t[k], where t at i and k at top
