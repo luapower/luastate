@@ -84,6 +84,17 @@ state:register(name, func)              set _G[name] = func
 state:setglobal(name)                   pop v and set _G[name] = v
 state:getglobal(name)                   push _G[name]
 state:getregistry()                     push the registry table
+__debug__
+state:getstack(level, dbg)->true|false  get debug info on stack level
+state:getinfo(what, dbg)                get debug on function or invocation
+state:getlocal(dbg, n) -> name          get local variable value and name
+state:setlocal(dbg, n) -> name          set value of local variable
+state:getupvalue(i, n) -> name          get upvalue (and name) of func at i
+state:setupvalue(i, n) -> name          set upvalue of func at i (and get its name)
+state:sethook(hook, mask, count)->?     set hook function
+state:gethook() -> hook                 return current hook function
+state:gethookmask() -> mask             get current hook mask
+state:gethookcount() -> n               get current hook count
 __C__
 luastate.C                              C namespace (i.e. the ffi clib object)
 --------------------------------------- --------------------------------------

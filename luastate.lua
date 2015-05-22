@@ -226,6 +226,9 @@ M.pushboolean = C.lua_pushboolean
 M.pushinteger = C.lua_pushinteger
 M.pushnumber = C.lua_pushnumber
 M.pushcclosure = C.lua_pushcclosure
+function M.lua_upvalueindex(i)
+	return C.LUA_GLOBALSINDEX - i
+end
 function M.pushcfunction(L, f)
 	C.lua_pushcclosure(L, f, 0)
 end
@@ -285,6 +288,25 @@ function M.push(L, v)
 		not_implemented()
 	end
 end
+
+--debug
+
+function M.getstack(level, dbg)
+	return C.lua_getstack(level, dbg) == 1
+end
+
+function M.getinfo(what, dbg)
+	assert(C.lua_getinfo(what, dbg) ~= 0)
+end
+
+M.getlocal = C.lua_getlocal
+M.setlocal = C.lua_setlocal
+M.getupvalue = C.lua_getupvalue
+M.setupvalue = C.lua_setupvalue
+M.sethook = C.lua_sethook
+M.gethook = C.lua_gethook
+M.gethookmask = C.lua_gethookmask
+M.gethookcount = C.lua_gethookcount
 
 --interpreter
 
