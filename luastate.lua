@@ -38,6 +38,7 @@ local function check(L, ret)
 	if ret == 0 then return true end
 	return false, M.tostring(L, -1)
 end
+M.check = check
 
 function M.loadbuffer(L, buf, sz, chunkname)
 	return check(L, C.luaL_loadbuffer(L, buf, sz, chunkname))
@@ -168,7 +169,7 @@ M.rawget = C.lua_rawget
 M.rawgeti = C.lua_rawgeti
 M.getmetatable = C.lua_getmetatable
 
-function M.get(L, index)
+function M.get(L, index, copy_upvalues)
 	index = index or -1
 	local t = M.type(L, index)
 	if t == 'nil' then
@@ -180,6 +181,7 @@ function M.get(L, index)
 	elseif t == 'string' then
 		return M.tostring(L, index)
 	elseif t == 'function' then
+		local top = M.gettop(L)
 		index = M.abs_index(L, index)
 		M.checkstack(L, 4)
 		M.getglobal(L, 'string')
@@ -187,8 +189,21 @@ function M.get(L, index)
 		M.pushvalue(L, index)
 		C.lua_call(L, 1, 1)
 		local s = M.get(L)
-		M.pop(L, 3)
-		return assert(loadstring(s))
+		M.pop(L, 2)
+		assert(M.gettop(L) == top)
+		local f = assert(loadstring(s))
+		if copy_upvalues then
+			local i = 1
+			while true do
+				if M.getupvalue(L, index, i) == nil then
+					break
+				end
+				debug.setupvalue(f, i, M.get(L, -1, true))
+				M.pop(L)
+				i = i + 1
+			end
+		end
+		return f
 	elseif t == 'table' then
 		--NOTE: doesn't check duplicate refs
 		--NOTE: stack-bound on table depth
@@ -251,8 +266,11 @@ function M.newtable(L)
 	C.lua_createtable(L, 0, 0)
 end
 M.xmove = C.lua_xmove
+M.insert = C.lua_insert
+M.remove = C.lua_remove
+M.replace = C.lua_replace
 
-function M.push(L, v)
+function M.push(L, v, copy_upvalues)
 	if type(v) == 'nil' then
 		M.pushnil(L)
 	elseif type(v) == 'boolean' then
@@ -263,15 +281,26 @@ function M.push(L, v)
 		M.pushstring(L, v)
 	elseif type(v) == 'function' then
 		M.loadstring(L, string.dump(v))
+		if copy_upvalues then
+			local i = 1
+			while true do
+				local uname, uv = debug.getupvalue(v, i)
+				if not uname then break end
+				M.push(L, uv, true)
+				M.setupvalue(L, -2, i)
+				i = i + 1
+			end
+		end
 	elseif type(v) == 'table' then
 		--NOTE: doesn't check duplicate refs
+		--NOTE: doesn't check for cycles
 		--NOTE: stack-bound on table depth
 		M.checkstack(L, 3)
 		M.newtable(L)
 		local top = M.gettop(L)
 		for k,v in pairs(v) do
-			M.push(L, k)
-			M.push(L, v)
+			M.push(L, k, copy_upvalues)
+			M.push(L, v, copy_upvalues)
 			M.settable(L, top)
 		end
 		assert(M.gettop(L) == top)
@@ -314,7 +343,8 @@ M.gethookcount = C.lua_gethookcount
 function M.pushvalues(L, ...)
 	local argc = select('#', ...)
 	for i = 1, argc do
-		M.push(L, select(i, ...))
+		local v = select(i, ...)
+		M.push(L, v)
 	end
 	return argc
 end
@@ -401,6 +431,24 @@ function M.getregistry(L)
 	C.lua_pushvalue(L, C.LUA_REGISTRYINDEX)
 end
 
+function M.dofile(L, filename)
+	local ok, err = M.loadfile(L, filename)
+	if ok then
+		return M.pcall(L)
+	else
+		return false, err
+	end
+end
+
+function M.dostring(L, s)
+	local ok, err = M.loadstring(L, s)
+	if ok then
+		return M.pcall(L)
+	else
+		return false, err
+	end
+end
+
 --object interface
 
 ffi.metatype('lua_State', {__index = {
@@ -413,6 +461,8 @@ ffi.metatype('lua_State', {__index = {
 	loadbuffer = M.loadbuffer,
 	loadstring = M.loadstring,
 	loadfile = M.loadfile,
+	dofile = M.dofile,
+	dostring = M.dostring,
 	load = M.load,
 	openlibs = M.openlibs,
 	--stack / indices
@@ -421,6 +471,10 @@ ffi.metatype('lua_State', {__index = {
 	settop = M.settop,
 	pop = M.pop,
 	checkstack = M.checkstack,
+	xmove = M.xmove,
+	insert = M.insert,
+	remove = M.remove,
+	replace = M.replace,
 	--stack / read
 	type = M.type,
 	objlen = M.objlen,
@@ -460,7 +514,6 @@ ffi.metatype('lua_State', {__index = {
 	rawset = M.rawset,
 	rawseti = M.rawseti,
 	setmetatable = M.setmetatable,
-	xmove = M.xmove,
 	--stack / write / synthesis
 	push = M.push,
 	--interpreter

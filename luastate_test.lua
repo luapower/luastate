@@ -58,6 +58,19 @@ assert(n == depth)
 lua:push(function(x) return x^2 end)
 local f = lua:get()
 assert(f(5) == 25)
+lua:pop()
+
+--test copying upvalues
+local x, y = 1, {a  = 1}
+local function f0()
+	assert(x == 1)
+	assert(y.a == 1)
+end
+f0()
+lua:push(f0, true)
+local f2 = lua:get(nil, true)
+lua:call()
+f2()
 
 assert(lua:gettop() == 0)
 lua:close()

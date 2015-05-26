@@ -22,12 +22,18 @@ state:loadstring(s, name)               load a Lua chunk from a string
 state:loadfile(filename)                load a Lua chunk from a file
 state:load(reader, data, chunkname)     load a Lua chunk from a reader function
 state:openlibs(lib1, ...)               open standard libs (open all, if no args given)
+state:dofile(filename) -> ok, ...       load and exec file
+state:dostring(string) -> ok, ...       load and exec string
 __stack / indices__
 state:abs_index() -> i                  absolute stack index
 state:gettop() -> i                     top stack index
 state:settop(i)                         set stack top index
 state:pop(n)                            pop n positions from stack
 state:checkstack(n)                     assert that stack can grow at least n positions
+state:xmove(dst_thread, i)              move values between threads of the same top state
+state:insert(i)                         insert top element at i
+state:remove(i)                         remove element at i
+state:replace(i)                        replace element at i with top element
 __stack / read__
 state:type(i) -> type                   type at index (same as type())
 state:objlen(i) -> n                    string/table/userdata length
@@ -39,7 +45,6 @@ state:tostring(i) -> s                  get as Lua string
 state:tothread(i) -> state              get as Lua state
 state:touserdata(i) -> ptr              get as userdata
 state:topointer(i) -> ptr               get as void* pointer
-state:xmove(dst_thread, i)              move values between threads
 __stack / read / tables__
 state:next(i) -> true | false           pop k and push the next k, v at i
 state:gettable(i)                       push t[k], where t at i and k at top
@@ -48,7 +53,7 @@ state:rawget(i)                         like gettable() but does raw access
 state:rawgeti(i, n)                     push t[n], where t at i
 state:getmetatable(tname)               push metatable of `tname` from registry
 __stack / get / any value__
-state:get(i) -> v                       get the value at i
+state:get([i], [copy_upvalues]) -> v    get the value at i (default i = -1)
 __stack / write__
 state:pushnil()                         push nil
 state:pushboolean(bool)                 push a boolean
@@ -69,7 +74,7 @@ state:rawset(i)                         as settable() but does raw assignment
 state:rawseti(i, n)                     t[n] = v, where t at i, v at top
 state:setmetatable(i)                   pop mt and setmetatable(t, mt), where t at i
 __stack / write / any value__
-state:push(i, v)                        push any value (see note below)
+state:push(v, [copy_upvalues])          push any value (see note below)
 __interpreter__
 state:pushvalues(...)                   push multiple values
 state:popvalues(top_before_call) -> ... pop multiple values and return then
@@ -104,21 +109,23 @@ luastate.C                              C namespace (i.e. the ffi clib object)
 Getting data out from a Lua state:
 
   * internal identity of tables is not preserved: duplicate keys
-  and values are dereferenced.
+  and values are dereferenced; no attempt is made to detect cycles.
   * the function for traversing tables is recursive so table depth
   is stack-bound.
-  * upvalues are not extracted.
   * coroutines are extracted as cdata of type `lua_State*`.
   * lightuserdata and userdata are extracted as `void*` pointers.
   * cdata cannot be extracted (an error is raised if attempted).
+  * function upvalues are copied only if `copy_upvalues` is given;
+  all of the limitations above apply to copying upvalues as well.
 
 Pushing data into a Lua state:
 
   * internal identity of tables is not preserved: duplicate keys
-  and values are dereferenced.
+  and values are dereferenced; no attempt is made to detect cycles.
   * the function for traversing tables is recursive so table depth
   is stack-bound.
-  * upvalues are not pushed.
   * lightuserdata, userdata, cdata and coroutines cannot be pushed
   (an error is raised if attempted).
+  * function upvalues are copied only if `copy_upvalues` is given;
+  all of the limitations above apply to copying upvalues as well.
 
