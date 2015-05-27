@@ -1,5 +1,5 @@
 
---Lua C API ffi binding for Lua 5.1 and LuaJIT2.
+--Lua C API binding, including LuaJIT2 extensions.
 --Written by Cosmin Apreutesei. Public Domain.
 
 if not ... then require'luastate_test'; return end
@@ -169,7 +169,8 @@ M.rawget = C.lua_rawget
 M.rawgeti = C.lua_rawgeti
 M.getmetatable = C.lua_getmetatable
 
-function M.get(L, index, copy_upvalues)
+function M.get(L, index, opt)
+	local copy_upvalues = opt and opt:find('u', 1, true)
 	index = index or -1
 	local t = M.type(L, index)
 	if t == 'nil' then
@@ -188,7 +189,7 @@ function M.get(L, index, copy_upvalues)
 		M.getfield(L, -1, 'dump')
 		M.pushvalue(L, index)
 		C.lua_call(L, 1, 1)
-		local s = M.get(L)
+		local s = M.get(L) --result of string.dump()
 		M.pop(L, 2)
 		assert(M.gettop(L) == top)
 		local f = assert(loadstring(s))
@@ -198,7 +199,7 @@ function M.get(L, index, copy_upvalues)
 				if M.getupvalue(L, index, i) == nil then
 					break
 				end
-				debug.setupvalue(f, i, M.get(L, -1, true))
+				debug.setupvalue(f, i, M.get(L, -1, opt))
 				M.pop(L)
 				i = i + 1
 			end
@@ -213,8 +214,8 @@ function M.get(L, index, copy_upvalues)
 		index = M.abs_index(L, index)
 		C.lua_pushnil(L) -- first key
 		while C.lua_next(L, index) ~= 0 do
-			local k = M.get(L, -2)
-			local v = M.get(L, -1)
+			local k = M.get(L, -2, opt)
+			local v = M.get(L, -1, opt)
 			dt[k] = v
 			M.pop(L) -- remove 'value'; keep 'key' for next iteration
 		end
@@ -270,7 +271,8 @@ M.insert = C.lua_insert
 M.remove = C.lua_remove
 M.replace = C.lua_replace
 
-function M.push(L, v, copy_upvalues)
+function M.push(L, v, opt)
+	local copy_upvalues = opt and opt:find('u', 1, true)
 	if type(v) == 'nil' then
 		M.pushnil(L)
 	elseif type(v) == 'boolean' then
@@ -286,7 +288,7 @@ function M.push(L, v, copy_upvalues)
 			while true do
 				local uname, uv = debug.getupvalue(v, i)
 				if not uname then break end
-				M.push(L, uv, true)
+				M.push(L, uv, opt)
 				M.setupvalue(L, -2, i)
 				i = i + 1
 			end
@@ -299,8 +301,8 @@ function M.push(L, v, copy_upvalues)
 		M.newtable(L)
 		local top = M.gettop(L)
 		for k,v in pairs(v) do
-			M.push(L, k, copy_upvalues)
-			M.push(L, v, copy_upvalues)
+			M.push(L, k, opt)
+			M.push(L, v, opt)
 			M.settable(L, top)
 		end
 		assert(M.gettop(L) == top)
@@ -340,45 +342,57 @@ M.gethookcount = C.lua_gethookcount
 --interpreter
 
 --push multiple values
-function M.pushvalues(L, ...)
+function M.pushvalues_opt(L, opt, ...)
 	local argc = select('#', ...)
 	for i = 1, argc do
 		local v = select(i, ...)
-		M.push(L, v)
+		M.push(L, v, opt)
 	end
 	return argc
 end
 
+function M.pushvalues(L, ...)
+	return M.pushvalues_opt(L, nil, ...)
+end
+
 --pop multiple values and return them
-function M.popvalues(L, top_before_call)
+function M.popvalues_opt(L, opt, top_before_call)
 	local n = M.gettop(L) - top_before_call + 1
 	if n == 0 then
-		return true
+		return
 	elseif n == 1 then
-		local ret = M.get(L, -1)
+		local ret = M.get(L, -1, opt)
 		M.pop(L)
-		return true, ret
+		return ret
 	else
 		--collect/pop/unpack return values
 		local t = {}
 		for i = 1, n do
-			t[i] = M.get(L, i - n - 1)
+			t[i] = M.get(L, i - n - 1, opt)
 		end
 		M.pop(L, n)
-		return true, unpack(t, 1, n)
+		return unpack(t, 1, n)
 	end
+end
+
+function M.popvalues(L, ...)
+	return M.popvalues_opt(L, nil, ...)
 end
 
 --call the function at the top of the stack,
 --wrapping the passing of args and the returning of return values.
-function M.pcall(L, ...)
+function M.pcall_opt(L, opt, ...)
 	local top = M.gettop(L)
-	local argc = M.pushvalues(L, ...)
+	local argc = M.pushvalues_opt(L, opt, ...)
 	local ok, err = check(L, C.lua_pcall(L, argc, C.LUA_MULTRET, 0))
 	if not ok then
 		return false, err
 	end
-	return M.popvalues(L, top)
+	return true, M.popvalues_opt(L, opt, top)
+end
+
+function M.pcall(L, ...)
+	return M.pcall_opt(L, nil, ...)
 end
 
 local function pass(ok, ...)
@@ -386,18 +400,26 @@ local function pass(ok, ...)
 	return ...
 end
 
+function M.call_opt(L, opt, ...)
+	return pass(M.pcall_opt(L, opt, ...))
+end
+
 function M.call(L, ...)
-	return pass(M.pcall(L, ...))
+	return M.call_opt(L, nil, ...)
 end
 
 --resume the coroutine at the top of the stack,
 --wrapping the passing of args and the returning of yielded values.
-function M.resume(L, ...)
+function M.resume_opt(L, opt, ...)
 	local top = M.gettop(L)
-	local argc = M.pushvalues(L, ...)
+	local argc = M.pushvalues_opt(L, opt, ...)
 	local ret = C.lua_resume(L, argc)
 	local ok = ret == 0 or ret == C.LUA_YIELD
-	return ok, M.popvalues(L, top)
+	return ok, M.popvalues_opt(L, opt, top)
+end
+
+function M.resume(L, ...)
+	return M.resume_opt(L, nil, ...)
 end
 
 --gc
@@ -431,19 +453,19 @@ function M.getregistry(L)
 	C.lua_pushvalue(L, C.LUA_REGISTRYINDEX)
 end
 
-function M.dofile(L, filename)
+function M.dofile(L, filename, opt, ...)
 	local ok, err = M.loadfile(L, filename)
 	if ok then
-		return M.pcall(L)
+		return M.pcall(L, opt, ...)
 	else
 		return false, err
 	end
 end
 
-function M.dostring(L, s)
+function M.dostring(L, s, opt, ...)
 	local ok, err = M.loadstring(L, s)
 	if ok then
-		return M.pcall(L)
+		return M.pcall(L, opt, ...)
 	else
 		return false, err
 	end
@@ -456,15 +478,16 @@ ffi.metatype('lua_State', {__index = {
 	close = M.close,
 	status = M.status,
 	newthread = M.newthread,
+	resume_opt = M.resume_opt,
 	resume = M.resume,
 	--compiler
+	openlibs = M.openlibs,
 	loadbuffer = M.loadbuffer,
 	loadstring = M.loadstring,
 	loadfile = M.loadfile,
+	load = M.load,
 	dofile = M.dofile,
 	dostring = M.dostring,
-	load = M.load,
-	openlibs = M.openlibs,
 	--stack / indices
 	abs_index = M.abs_index,
 	gettop = M.gettop,
@@ -517,8 +540,12 @@ ffi.metatype('lua_State', {__index = {
 	--stack / write / synthesis
 	push = M.push,
 	--interpreter
+	pushvalues_opt = M.pushvalues_opt,
+	popvalues_opt = M.popvalues_opt,
 	pushvalues = M.pushvalues,
 	popvalues = M.popvalues,
+	pcall_opt = M.pcall_opt,
+	call_opt = M.call_opt,
 	pcall = M.pcall,
 	call = M.call,
 	--gc

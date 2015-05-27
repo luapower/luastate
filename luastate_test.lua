@@ -4,6 +4,7 @@ local lua = luastate.open()
 lua:openlibs('base')
 lua:openlibs()
 
+--test arg. and retval passing
 assert(lua:loadstring([[
 	return ...
 ]], 'main'))
@@ -24,6 +25,7 @@ end
 assert(tk.a == 1)
 assert(tv.b == '')
 
+--test max. depth for table copy
 local upvalue = 5
 local depth = 3000
 lua:push(function(depth, ...)
@@ -67,8 +69,8 @@ local function f0()
 	assert(y.a == 1)
 end
 f0()
-lua:push(f0, true)
-local f2 = lua:get(nil, true)
+lua:push(f0, 'u')
+local f2 = lua:get(nil, 'u')
 lua:call()
 f2()
 
